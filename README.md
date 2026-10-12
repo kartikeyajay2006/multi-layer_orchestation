@@ -1,243 +1,163 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/Chakraview-AI%20Agent%20Command%20Center-blue?style=for-the-badge&logo=openai&logoColor=white" />
-  <img src="https://img.shields.io/badge/version-0.8.2-purple?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" />
-</p>
+<div align="center">
 
-<h1 align="center">⚡ Chakraview — AI Agent Command Center</h1>
+# ⚡ Chakraview: AI Agent Command Center
 
-<p align="center">
-  <strong>The control layer for multi-agent AI systems — enabling orchestration, observability, and governance at scale.</strong>
-</p>
+**Launch many AI agents at once, watch every step they take, and step in when they are unsure.**
 
-<p align="center">
-  <a href="#-demo">Demo</a> •
-  <a href="#-overview">Overview</a> •
-  <a href="#-problem">Problem</a> •
-  <a href="#-solution">Solution</a> •
-  <a href="#-why-this-matters">Why This Matters</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-business-model">Business Model</a> •
-  <a href="#-tech-stack">Tech Stack</a> •
-  <a href="#-setup">Setup</a>
-</p>
+Chakraview is a control plane for multi-agent work. Agents run tasks and workflows in parallel, every decision is logged as a node you can inspect, and any low-confidence result waits for a human before it counts.
+
+[![Live demo](https://img.shields.io/badge/live_demo-open-22c55e?style=flat-square&logo=vercel&logoColor=white)](https://multi-layer-orchestation.vercel.app/)
+[![Next.js](https://img.shields.io/badge/Next.js_14-frontend-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Fastify](https://img.shields.io/badge/Fastify-backend-202020?style=flat-square&logo=fastify&logoColor=white)](https://fastify.dev/)
+[![SQLite](https://img.shields.io/badge/SQLite-sql.js-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sql.js.org/)
+[![WebSockets](https://img.shields.io/badge/realtime-WebSockets-4f46e5?style=flat-square)](#realtime)
+[![OpenAI](https://img.shields.io/badge/OpenAI-agents-412991?style=flat-square&logo=openai&logoColor=white)](https://platform.openai.com/)
+
+<img src="demo1.gif" alt="Chakraview demo: launching agents, watching the task graph update live, approving a low-confidence result" width="100%">
+
+[Live demo](https://multi-layer-orchestation.vercel.app/) · [Why](#why) · [The three layers](#the-three-layers) · [Quick start](#quick-start) · [API](#api)
+
+</div>
 
 ---
 
-## 🎥 Demo
+## Why
 
-* 🔗 Live App: <https://multi-layer-orchestation.vercel.app/>
-![Chakraview Demo](demo1.gif)
+Single prompts became multi-step agent workflows, but the tooling around them did not keep up:
 
----
+- When five agents run at once, nobody can see what each one is doing.
+- When an agent is wrong, there is no record of *why* it decided what it did.
+- When an agent is unsure, its output usually ships anyway.
+- Nobody knows what the team is spending on tokens.
 
-## 🚀 Overview
+Chakraview is the layer that sits **above** the agents and handles orchestration, observability and control.
 
-**Chakraview** is a **multi-layer AI orchestration platform** that enables teams to launch, monitor, and control multiple AI agents executing tasks in parallel — with built-in **human oversight, cost control, and system safety**.
+## The three layers
 
-It acts as a **control plane for agentic systems**, solving the growing complexity of managing autonomous AI workflows in production environments.
+```mermaid
+flowchart TB
+    U[Operator] -->|launch task / run workflow| O
 
----
+    subgraph O[1 · Orchestration]
+        P[Planner] --> G[Task graph<br/>plan → execute → review]
+        W[Workflow engine<br/>multi-step pipelines] --> G
+    end
 
-## ❗ Problem
+    subgraph V[2 · Observability]
+        L[Node-level logs<br/>input · output · tokens]
+        WS[Live WebSocket feed]
+    end
 
-AI systems are evolving from single prompts to **multi-agent workflows**, but current tooling is not designed for this shift.
+    subgraph C[3 · Control]
+        CF{Confidence ≥ threshold?}
+        Q[Oversight queue<br/>approve / reject]
+        R[RBAC · workspaces · usage]
+    end
 
-Key challenges:
+    G --> L --> WS
+    G --> CF
+    CF -- yes --> Done[Completed]
+    CF -- no --> Q --> Done
+```
 
-* No centralized control over multiple agents
-* Workflows are fragile and hard to debug
-* No auditability or reasoning visibility
-* Lack of human-in-the-loop safety
-* Poor cost and resource tracking
+1. **Orchestration.** A task goes through planner, model-execution and result-review nodes. Workflows chain several steps, and tasks run in parallel with priorities.
+2. **Observability.** Every node records its input, output and token use. Updates stream to the dashboard over WebSockets, so the task graph moves while you watch.
+3. **Control.** Each result gets a confidence score. Below `OVERSIGHT_CONFIDENCE_THRESHOLD` (0.7 by default) the task stops at `waiting_for_approval` and lands in the **oversight queue** for an operator to approve or reject.
 
-👉 Result:
+## Features
 
-* Unreliable automation
-* High operational risk
-* Limited enterprise adoption
+| | |
+|---|---|
+| 🤖 **Agent fleet** | Create agents with their own system prompt, model, capabilities, temperature and token limits |
+| 🧩 **Workflow builder** | Build multi-step pipelines and run them on demand |
+| 🕸️ **Live task graph** | Planner → execution → review nodes update in real time |
+| 🛑 **Human oversight** | Low-confidence results wait in an approval queue |
+| 🏢 **Multi-tenant** | Workspace isolation, with roles from owner and admin down to operator and viewer |
+| 📊 **Analytics and billing** | Token use per workspace, usage dashboard and plan status |
+| ✨ **AI input assist** | Suggests a well-formed task input from a rough idea |
+| 🔑 **Bring your own key** | The OpenAI key is set per workspace in Settings |
 
----
+## Tech stack
 
-## 💡 Solution
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 14 (App Router), React 18 |
+| Backend | Node.js, Fastify, `@fastify/jwt`, `@fastify/websocket`, `@fastify/cors` |
+| Storage | SQLite through sql.js, persisted to `data/agents.db` |
+| AI | OpenAI API |
+| Auth | JWT and bcrypt |
 
-**Chakraview — AI Agent Command Center**
+## Quick start
 
-A platform that provides:
+**Prerequisites:** Node.js 18+, an OpenAI API key.
 
-### 1. Orchestration Layer
-
-* Task → Planner → DAG-based execution
-* Parallel agent execution with queue-based processing
-
-### 2. Control Layer
-
-* Human approval for sensitive actions
-* Role-based access (Owner, Admin, Operator, Viewer)
-* Workspace-level isolation (multi-tenancy)
-
-### 3. Observability Layer
-
-* Real-time task monitoring
-* Full decision logs (thought, action, tool usage)
-* Replay system for debugging and iteration
-
----
-
-## ⏱️ Why This Matters
-
-* AI agents are becoming core to business workflows
-* Enterprises require **control, compliance, and visibility**
-* Existing tools focus on building agents — not managing them
-
-👉 Chakraview focuses on the missing layer:
-**Control + Governance for AI systems**
-
----
-
-## 🧠 Architecture
-
-### Execution Flow
-
-User Input → Planner → Task Graph (DAG) → Queue → Workers → Agents → Output
-
-### System Components
-
-* **Planner Engine** → Converts tasks into execution graphs
-* **Queue System** → Handles scalable task distribution (Redis/Kafka)
-* **Worker Nodes** → Execute agent tasks
-* **Memory Layer**
-
-  * Short-term → Redis
-  * Long-term → Vector DB
-* **Control System**
-
-  * Approval system
-  * Guardrails
-  * Budget enforcement
-
----
-
-## ✨ Features
-
-### Core System
-
-* Multi-agent orchestration with parallel execution
-* Visual workflow system (DAG-based pipelines)
-* Real-time execution tracking
-
-### System Controls
-
-* Human-in-the-loop approvals
-* Task and node state management
-* Planner versioning for reproducibility
-
-### Intelligence & Safety
-
-* Structured reasoning logs (thought, action, reason)
-* Tool guardrails and validation
-* Automatic replanning on failure
-
-### Platform
-
-* Multi-tenancy with workspace isolation
-* RBAC (Owner, Admin, Operator, Viewer)
-* Token usage tracking and cost control
-
----
-
-## 💰 Business Model
-
-Chakraview is designed as a **platform for AI operations**:
-
-### Pricing Strategy
-
-* Usage-based pricing (tasks / tokens / workflows)
-* Team-based subscriptions
-* Enterprise plans (security, audit logs, SLAs)
-
-### Target Users
-
-* AI-first startups
-* Internal automation teams
-* Enterprises deploying agent workflows
-
----
-
-## 🏗️ Tech Stack
-
-| Layer    | Technology                       |
-| -------- | -------------------------------- |
-| Frontend | Next.js 14, React 18             |
-| Backend  | Node.js + Fastify                |
-| Database | SQLite (dev) / PostgreSQL (prod) |
-| AI       | OpenAI API                       |
-| Realtime | WebSockets                       |
-| Queue    | Redis / Kafka                    |
-| Memory   | Redis + Vector DB                |
-
----
-
-## ⚙️ Setup
-
-### Prerequisites
-
-* Node.js ≥ 18
-* npm ≥ 9
-* OpenAI API key
-
-### Run Locally
-
-```bash id="run01"
-git clone https://github.com/kartikeya2006jay/multi-layer_orchestation.git
+```bash
+git clone https://github.com/kartikeyajay2006/multi-layer_orchestation.git
 cd multi-layer_orchestation
 npm run install:all
-npm run dev
 ```
 
-### Environment
+Create `backend/.env`:
 
-<!-- **backend/.env**
-
-```env id="env01"
+```env
 PORT=3001
-JWT_SECRET=your_secret
-OPENAI_API_KEY=your_key
+JWT_SECRET=change-me
+OVERSIGHT_CONFIDENCE_THRESHOLD=0.7
 ```
 
-**frontend/.env**
+Create `frontend/.env`:
 
-```env id="env02"
+```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_WS_URL=ws://localhost:3001/ws
 ```
 
---- -->
+Then run the API and the dashboard together:
 
-## ▶️ Usage
+```bash
+npm run dev      # API on :3001, dashboard on :3000
+```
 
-1. Create account and workspace
-2. Configure API key
-3. Launch agents and tasks
-4. Monitor execution in dashboard
-5. Approve/reject critical outputs
+Sign up, add your OpenAI key under **Settings**, create an agent and launch a task.
 
----
+## API
 
-## 🌐 Deployment
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /api/auth/signup` · `/login` · `/logout` · `GET /api/auth/me` |
+| Agents | `GET POST /api/agents` · `GET PUT DELETE /api/agents/:id` |
+| Tasks | `POST /api/tasks/launch` · `GET /api/tasks` · `GET /api/tasks/:id` · `/logs` · `/nodes` · `POST /api/tasks/:id/cancel` |
+| Workflows | `GET POST /api/workflows` · `GET PUT DELETE /api/workflows/:id` · `POST /api/workflows/:id/execute` |
+| Oversight | `GET /api/oversight/queue` · `POST /api/oversight/:id/approve` · `/reject` |
+| Admin | `GET /api/admin/summary` · `/activity` · `/workspace-members` · `POST /api/admin/update-user` |
+| Billing | `GET /api/billing/status` · `/usage` · `POST /api/billing/checkout` |
+| Other | `GET /api/dashboard/stats` · `GET PUT /api/settings` · `POST /api/ai/suggest-input` · `GET /api/health` |
+| Realtime | `GET /ws` (WebSocket) |
 
-* Frontend → Vercel
-* Backend → Railway 
+## Project structure
 
----
+```text
+backend/src/
+  index.js              Fastify server, auth, CORS, WebSocket gateway
+  routes/               auth, agents, tasks, workflows, oversight, admin, billing, settings, ai
+  services/
+    orchestrator.js     launch, cancel, run workflows
+    agentRunner.js      plan → execute → review nodes, confidence, oversight
+    openai.js           per-workspace client, planning, result analysis
+    websocket.js        broadcast to dashboards
+frontend/
+  app/                  dashboard, agents, tasks, workflows, oversight, analytics, admin, billing
+  components/           TaskGraph, WorkflowBuilder, AgentFleet, TaskQueue, MetricCards
+```
 
-## 📄 License
+## Roadmap
 
-MIT License
+- PostgreSQL storage and a Redis job queue for horizontal scale
+- Replay a past task with a different model or prompt
+- Tool-call guardrails with allowlists per agent
+- Cost budgets that pause a workspace before it overspends
 
----
+## Author
 
-<p align="center">
-  <strong>Built with ⚡ by the Chakraview team</strong>
-</p>
+Built by **[Kartikeya Yadav](https://github.com/kartikeyajay2006)**.
+[LinkedIn](https://www.linkedin.com/in/kartikeya2006/) · [Portfolio](https://kartikeya-portfolio-rx7w.vercel.app/)
